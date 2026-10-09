@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地球資源・農産物 地理学習ナビゲーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: #0f172a;
+        }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden bg-slate-950">
+
+    <!-- Header -->
+    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur shrink-0 px-4 py-3 z-20">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-xl shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid font-bold fa-globe text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-wide">GeoResource Academy</h1>
+                    <p class="text-xs text-slate-400">農産物の適地環境 & 鉱産資源の採掘地質を網羅する地理学習アプリ</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <nav class="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs sm:text-sm">
+                <button onclick="switchTab('explorer')" id="tab-explorer" class="nav-tab px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-2 bg-emerald-600 text-white shadow">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>図鑑・検索</span>
+                </button>
+                <button onclick="switchTab('map-view')" id="tab-map-view" class="nav-tab px-3.5 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>分布マップ</span>
+                </button>
+                <button onclick="switchTab('matrix')" id="tab-matrix" class="nav-tab px-3.5 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-table-cells"></i>
+                    <span>系統対比表</span>
+                </button>
+                <button onclick="switchTab('quiz')" id="tab-quiz" class="nav-tab px-3.5 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-brain"></i>
+                    <span>学習クイズ</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-hidden relative">
+
+        <!-- SECTION 1: Explorer Tab -->
+        <section id="section-explorer" class="h-full flex flex-col p-4 max-w-7xl mx-auto gap-4 overflow-y-auto custom-scrollbar">
+            <!-- Filter Bar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center shrink-0">
+                <!-- Mode Toggle -->
+                <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button onclick="setCategoryFilter('all')" id="cat-all" class="cat-btn px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-white shadow">すべて</button>
+                    <button onclick="setCategoryFilter('agri')" id="cat-agri" class="cat-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-wheat-awn text-emerald-400"></i> 農産物
+                    </button>
+                    <button onclick="setCategoryFilter('mineral')" id="cat-mineral" class="cat-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-gem text-amber-400"></i> 鉱産資源
+                    </button>
+                </div>
+
+                <!-- Sub Filter Selects -->
+                <div class="flex flex-wrap items-center gap-3 flex-1 max-w-2xl">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="search-input" oninput="renderExplorerCards()" placeholder="名称、気候、土壌、国名で検索..." class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-emerald-500 transition">
+                    </div>
+                    
+                    <select id="environment-filter" onchange="renderExplorerCards()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                        <option value="">すべての環境・気候・地質</option>
+                        <optgroup label="農産物：気候帯">
+                            <option value="熱帯">熱帯 (Af, Aw)</option>
+                            <option value="乾燥帯">乾燥帯 (BS, BW)</option>
+                            <option value="地中海性">地中海性気候 (Cs)</option>
+                            <option value="温暖湿潤・西岸">温帯 (Cfa, Cfb)</option>
+                            <option value="冷帯">冷帯/亜寒帯 (D)</option>
+                        </optgroup>
+                        <optgroup label="鉱産資源：地質構造">
+                            <option value="安定陸塊">安定陸塊（クラトン）</option>
+                            <option value="古期造山帯">古期造山帯</option>
+                            <option value="新期造山帯">新期造山帯</option>
+                            <option value="背斜構造">背斜構造・沈殿層（油田等）</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Card Grid -->
+            <div id="explorer-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
+                <!-- Dynamically Populated -->
+            </div>
+        </section>
+
+        <!-- SECTION 2: Map View Tab -->
+        <section id="section-map-view" class="h-full hidden flex-col md:flex-row gap-0 md:gap-4 p-0 md:p-4 max-w-7xl mx-auto">
+            <!-- Sidebar Controls -->
+            <div class="w-full md:w-80 bg-slate-900 border-b md:border border-slate-800 md:rounded-2xl p-4 flex flex-col gap-4 shrink-0 overflow-y-auto custom-scrollbar max-h-[40vh] md:max-h-full">
+                <div>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-filter text-emerald-400"></i> 表示対象を選択
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">選択した資源・作物の主要採掘地/適栽培エリアを地図上にプロットします。</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-slate-300">表示アイテム:</label>
+                    <select id="map-item-select" onchange="updateMapDisplay()" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl p-2.5 focus:outline-none focus:border-emerald-500">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Info Box for Selected Map Item -->
+                <div id="map-item-info" class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 text-xs space-y-2">
+                    <div class="text-slate-400">アイテムを選択してください</div>
+                </div>
+
+                <!-- Map Legend -->
+                <div class="border-t border-slate-800 pt-3 space-y-2 text-xs">
+                    <span class="font-semibold text-slate-300">地質・気候ガイドメモ</span>
+                    <div class="space-y-1.5 text-slate-400 text-[11px]">
+                        <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> 安定陸塊：鉄鉱石、金、ダイヤモンド</div>
+                        <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block"></span> 古期造山帯：石炭（古生代）</div>
+                        <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> 新期造山帯：銅鉱石、石油（背斜構造）</div>
+                        <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> 熱帯・風化ラトソル：ボーキサイト</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaflet Map Canvas Container -->
+            <div class="flex-1 bg-slate-900 border border-slate-800 md:rounded-2xl overflow-hidden relative min-h-[350px]">
+                <div id="map" class="z-10"></div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: Matrix Tab -->
+        <section id="section-matrix" class="h-full hidden p-4 max-w-7xl mx-auto overflow-y-auto custom-scrollbar">
+            <div class="space-y-6 pb-8">
+                <!-- Agriculture Matrix Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                            <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-white">気候区分・土壌条件 × 代表的農産物 対比表</h2>
+                            <p class="text-xs text-slate-400">どのような気候帯と土壌条件で作物が育つかの系統整理</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse min-w-[700px]">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-400 bg-slate-950/50">
+                                    <th class="p-3">気候区分</th>
+                                    <th class="p-3">特徴的な土壌・環境</th>
+                                    <th class="p-3">代表的な農産物</th>
+                                    <th class="p-3">主たる栽培条件・理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 text-slate-300">
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">熱帯雨林気候 (Af)</td>
+                                    <td class="p-3">ラトソル（赤色強酸性、貧栄養）</td>
+                                    <td class="p-3 font-medium text-white">バナナ、天然ゴム、カカオ、油ヤシ</td>
+                                    <td class="p-3 text-slate-400">年間を通した高温多雨が必要。沿岸低地でのプランテーション栽培や日陰栽培。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">サバナ気候 (Aw) / 熱帯高地</td>
+                                    <td class="p-3">テラローシャ（玄武岩質風化土）、テラロッサ</td>
+                                    <td class="p-3 font-medium text-white">コーヒー、サトウキビ、綿花</td>
+                                    <td class="p-3 text-slate-400">雨季と乾季の明確な周期。コーヒーは霜の降りない排水の良い高地。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">地中海性気候 (Cs)</td>
+                                    <td class="p-3">テラロッサ（石灰岩質赤色土）、石灰質</td>
+                                    <td class="p-3 font-medium text-white">ブドウ、オリーブ、トマト、柑橘類</td>
+                                    <td class="p-3 text-slate-400">夏の乾燥と豊かな日照に耐える耐乾性・樹木作（地中海式農業・園芸作）。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">乾燥帯・オアシス (BW, BS)</td>
+                                    <td class="p-3">塩分に強く水はけのよいオアシス周辺土壌</td>
+                                    <td class="p-3 font-medium text-white">ナツメヤシ (デーツ)、長繊維綿花</td>
+                                    <td class="p-3 text-slate-400">極度の高温乾燥。湧水や灌漑用水を利用した地下水依存型オアシス農業。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">温帯モンスーン (Cfa, Cwa)</td>
+                                    <td class="p-3">沖積土（河川堆積土）、黒ボク土</td>
+                                    <td class="p-3 font-medium text-white">米（アジアイネ）、茶、トウモロコシ</td>
+                                    <td class="p-3 text-slate-400">夏季の高温多雨と平野の水資源。茶は弱酸性の水はけ良い丘陵地。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">冷帯・寒冷高地 (D, Cfb)</td>
+                                    <td class="p-3">ポドゾル（灰白色酸性土）、砂質・酸性土壌</td>
+                                    <td class="p-3 font-medium text-white">ジャガイモ、リンゴ、ライ麦、小麦</td>
+                                    <td class="p-3 text-slate-400">冷涼な気候に適応。短期間の生育が可能で土地を選ばない耐寒性作物。</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-emerald-400">ステップ・半乾燥 (BS/D)</td>
+                                    <td class="p-3">チェルノーゼム（黒土）、プレーリー土</td>
+                                    <td class="p-3 font-medium text-white">小麦、大麦、トウモロコシ</td>
+                                    <td class="p-3 text-slate-400">年降水量500mm程度の半乾燥地帯。肥沃な腐植層で大企業的農業。</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Minerals Matrix Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+                            <i class="fa-solid fa-mountain text-lg"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-white">地質構造・地殻変動 × 鉱産資源 対比表</h2>
+                            <p class="text-xs text-slate-400">地球の成り立ち（造山帯・陸塊）と鉱床の分布法則</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse min-w-[700px]">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-400 bg-slate-950/50">
+                                    <th class="p-3">地質構造 / 時代の区分</th>
+                                    <th class="p-3">成因・地質的メカニズム</th>
+                                    <th class="p-3">主要な鉱産資源</th>
+                                    <th class="p-3">代表的な世界的主要産地</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 text-slate-300">
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">安定陸塊 (先カンブリア時代)</td>
+                                    <td class="p-3">古代の海水中に沈殿した鉄イオンが酸化（帯状鉄鉱層）。</td>
+                                    <td class="p-3 font-medium text-white">鉄鉱石、金、ダイヤモンド、プラチナ</td>
+                                    <td class="p-3 text-slate-400">オーストラリア（ピルバラ）、ブラジル（カラジャス）、南アフリカ</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">古期造山帯 (古生代)</td>
+                                    <td class="p-3">古生代シダ植物群の大規模な埋没・炭化。なだらかな山脈。</td>
+                                    <td class="p-3 font-medium text-white">石炭 (無煙炭・粘結炭)</td>
+                                    <td class="p-3 text-slate-400">アパラチア山脈（米）、ウラル山脈（露）、アパラチア・オーストラリア東部</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">新期造山帯 (中生代〜新生代)</td>
+                                    <td class="p-3">プレート境界でのマグマ活動と熱水鉱床形成。急峻な山脈。</td>
+                                    <td class="p-3 font-medium text-white">銅鉱石、銀、亜鉛、錫（スズ）</td>
+                                    <td class="p-3 text-slate-400">アンデス山脈（チリ・チュキカマタ銅山）、ロッキー山脈、日本海溝沿い</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">背斜構造・堆積平野 (中生代〜新生代)</td>
+                                    <td class="p-3">浅い海・湖のプランクトン等の死骸が加熱分解。ドーム状不透水層に蓄積。</td>
+                                    <td class="p-3 font-medium text-white">石油（原油）、天然ガス</td>
+                                    <td class="p-3 text-slate-400">ペルシャ湾沿岸（中東）、北海油田、西シベリア、メキシコ湾沿岸</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">熱帯ラトソル風化帯</td>
+                                    <td class="p-3">高温多雨による強烈な風化（淋溶作用）で珪酸分が抜けアルミニウムが濃縮。</td>
+                                    <td class="p-3 font-medium text-white">ボーキサイト (アルミ原料)</td>
+                                    <td class="p-3 text-slate-400">オーストラリア（ウェパ）、ジャマイカ、ブラジル、ギニア</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/30">
+                                    <td class="p-3 font-semibold text-amber-400">乾燥帯の塩湖・鉱床</td>
+                                    <td class="p-3">蒸発量が極めて大きい塩湖でのリチウム・カリウム塩類の濃縮。</td>
+                                    <td class="p-3 font-medium text-white">リチウム、岩塩、カリ鉱石</td>
+                                    <td class="p-3 text-slate-400">チリ（アタカマ塩原）、ボリビア（ウユニ塩原）、オーストラリア</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: Quiz Tab -->
+        <section id="section-quiz" class="h-full hidden p-4 max-w-4xl mx-auto overflow-y-auto custom-scrollbar">
+            <div class="my-auto py-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden space-y-6">
+                    
+                    <!-- Quiz Header & Category Filter Bar -->
+                    <div class="space-y-4 border-b border-slate-800 pb-4">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                                <i class="fa-solid fa-graduation-cap text-base"></i>
+                                <span>適性＆地質マッチングクイズ</span>
+                            </div>
+                            <div id="quiz-progress-text" class="text-xs font-bold text-slate-400">Question 1 / 5</div>
+                        </div>
+
+                        <!-- Quiz Category Selector -->
+                        <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                            <span class="text-slate-400 font-semibold mr-1">出題カテゴリ:</span>
+                            <button onclick="setQuizFilter('all')" id="qfilter-all" class="qfilter-btn px-3 py-1 rounded-lg bg-emerald-600 text-white font-medium shadow">すべて</button>
+                            <button onclick="setQuizFilter('agri')" id="qfilter-agri" class="qfilter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium">農産物・穀物</button>
+                            <button onclick="setQuizFilter('fruit')" id="qfilter-fruit" class="qfilter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium">果物・野菜</button>
+                            <button onclick="setQuizFilter('mineral')" id="qfilter-mineral" class="qfilter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium">鉱産資源</button>
+                        </div>
+                    </div>
+
+                    <!-- Quiz Card Content -->
+                    <div id="quiz-container" class="space-y-6">
+                        <div id="quiz-question-box" class="space-y-2">
+                            <span id="quiz-tag" class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-block">農産物適地問題</span>
+                            <h2 id="quiz-question" class="text-lg md:text-xl font-bold text-white leading-relaxed">
+                                質問がここに読み込まれます...
+                            </h2>
+                        </div>
+
+                        <!-- Hint / Conditions Badge Container -->
+                        <div id="quiz-conditions" class="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 space-y-2 text-xs text-slate-300">
+                            <!-- Conditions JS Insert -->
+                        </div>
+
+                        <!-- Options Grid -->
+                        <div id="quiz-options" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Dynamic Buttons -->
+                        </div>
+
+                        <!-- Explanation Area -->
+                        <div id="quiz-explanation" class="hidden bg-slate-950/90 border border-slate-800 p-4 rounded-2xl text-xs space-y-3">
+                            <div id="quiz-result-title" class="font-bold text-sm"></div>
+                            <p id="quiz-result-body" class="text-slate-300 leading-relaxed"></p>
+                            <button onclick="nextQuestion()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition shadow flex items-center justify-center gap-2">
+                                <span>次の問題へ進む</span>
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Final Score Screen (Hidden by default) -->
+                    <div id="quiz-score-screen" class="hidden text-center py-8 space-y-6">
+                        <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-3xl">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">クイズ完了！</h2>
+                            <p id="quiz-score-text" class="text-slate-400 text-sm mt-1">あなたのスコア: 5問中 5問正解</p>
+                        </div>
+                        <button onclick="restartQuiz()" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>もう一度チャレンジする</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar p-6 space-y-5 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div id="modal-content">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Definitions
+        const DATA_ITEMS = [
+            // AGRICULTURAL PRODUCTS
+            {
+                id: 'rice',
+                type: 'agri',
+                name: '米 (アジアイネ)',
+                category: '穀物',
+                icon: '🌾',
+                badgeColor: 'emerald',
+                environment: '熱帯・温帯モンスーン',
+                climateDetails: '夏季に高温多雨（年間降水量 1,000mm 以上が目安）',
+                soilDetails: '保水性の高い沖積土・粘土質土壌（河川下流・三角州）',
+                geographyNote: 'アジアのモンスーン地帯に集中。平地では水田、傾斜地では棚田（ライステラス）を形成。人口支持力が高く集約的稲作が行われる。',
+                producers: ['中国', 'インド', 'インドネシア', 'バングラデシュ', 'ベトナム'],
+                locations: [
+                    { name: '長江中下流 (中国)', lat: 30.5, lng: 114.3 },
+                    { name: 'ガンンジ川デルタ (インド・バングラデシュ)', lat: 23.8, lng: 90.4 },
+                    { name: 'ジャワ島 (インドネシア)', lat: -7.5, lng: 110.4 },
+                    { name: 'メコン川デルタ (ベトナム)', lat: 10.0, lng: 105.8 }
+                ]
+            },
+            {
+                id: 'wheat',
+                type: 'agri',
+                name: '小麦',
+                category: '穀物',
+                icon: '🌾',
+                badgeColor: 'amber',
+                environment: '温帯・冷帯・ステップ気候',
+                climateDetails: 'やや乾燥〜半乾燥（年降水量 500〜800mm 前後）、冷涼な気候に適応',
+                soilDetails: 'チェルノーゼム（黒土）、プレーリー土（有機物に富む極めて肥沃な土壌）',
+                geographyNote: '米よりも比較的乾燥・冷涼な地帯で栽培可能。春小麦（冷帯）と冬小麦（温帯）に分かれる。アメリカのプレーリー、ウクライナの黒土地帯、オーストラリアで大規模栽培。',
+                producers: ['中国', 'インド', 'ロシア', 'アメリカ', 'オーストラリア'],
+                locations: [
+                    { name: 'チェルノーゼム地帯 (ウクライナ/ロシア)', lat: 49.0, lng: 32.0 },
+                    { name: 'グレートプレーンズ (アメリカ)', lat: 38.5, lng: -98.0 },
+                    { name: 'マリー・ダーリング盆地 (オーストラリア)', lat: -34.0, lng: 142.0 },
+                    { name: 'パンパ (アルゼンチン)', lat: -35.0, lng: -62.0 }
+                ]
+            },
+            {
+                id: 'corn',
+                type: 'agri',
+                name: 'トウモロコシ',
+                category: '穀物・飼料作物',
+                icon: '🌽',
+                badgeColor: 'yellow',
+                environment: '温帯・熱帯',
+                climateDetails: '生長期に十分な日照と高温多雨（夏季高温が必要）',
+                soilDetails: '排水が良く肥沃な土壌（プレーリー土、褐色森林土など）',
+                geographyNote: '食用・家畜飼料・バイオエタノール原料と用途が広範。アメリカのコーンベルトで大豆と交互に保全輪作される。',
+                producers: ['アメリカ', '中国', 'ブラジル', 'アルゼンチン', 'ウクライナ'],
+                locations: [
+                    { name: 'コーンベルト (アメリカ・アイオワ等)', lat: 42.0, lng: -93.5 },
+                    { name: '東北平原 (中国)', lat: 44.0, lng: 125.0 },
+                    { name: 'マトグロッソ州 (ブラジル)', lat: -12.6, lng: -55.5 }
+                ]
+            },
+            {
+                id: 'coffee',
+                type: 'agri',
+                name: 'コーヒー',
+                category: '嗜好品・商品作物',
+                icon: '☕',
+                badgeColor: 'amber',
+                environment: '熱帯高地 (コーヒーベルト)',
+                climateDetails: '年間平均気温 15〜25℃（霜が降りない）、明確な雨季と乾季',
+                soilDetails: 'テラローシャ（玄武岩質の風化土・ブラジル）、テラロッサ（水はけの良い火山灰土）',
+                geographyNote: '赤道をはさむ北緯25度〜南緯25度の高原地帯で栽培。強烈な直射日光を避けるシェードツリー（日陰樹）が用いられることもある。',
+                producers: ['ブラジル', 'ベトナム', 'コロンビア', 'インドネシア', 'エチオピア'],
+                locations: [
+                    { name: 'サンパウロ・テラローシャ地帯 (ブラジル)', lat: -23.5, lng: -46.6 },
+                    { name: '中部高原 (ベトナム)', lat: 12.6, lng: 108.0 },
+                    { name: 'アンデス山麓高地 (コロンビア)', lat: 4.5, lng: -75.6 }
+                ]
+            },
+            {
+                id: 'tea',
+                type: 'agri',
+                name: '茶',
+                category: '嗜好品・商品作物',
+                icon: '🍵',
+                badgeColor: 'emerald',
+                environment: '温暖湿潤気候・熱帯高地',
+                climateDetails: '年間を通じて温暖多雨（年降水量 1,500mm 以上）',
+                soilDetails: '排水性の良い弱酸性土壌（丘陵地・傾斜地）',
+                geographyNote: '根が水に浸かるのを嫌うため、平野部よりも水はけの良い丘陵・山地の傾斜地が適している。摘採に多大な労働力が必要。',
+                producers: ['中国', 'インド', 'ケニア', 'スリランカ', 'ベトナム'],
+                locations: [
+                    { name: 'アッサム・ダージリン (インド)', lat: 26.8, lng: 88.2 },
+                    { name: '浙江省・福建省 (中国)', lat: 29.5, lng: 120.0 },
+                    { name: 'ケニア高地 (ケニア)', lat: -0.3, lng: 35.2 },
+                    { name: 'セイロン高地 (スリランカ)', lat: 6.9, lng: 80.6 }
+                ]
+            },
+            {
+                id: 'olive',
+                type: 'agri',
+                name: 'オリーブ',
+                category: '樹木作・油料作物',
+                icon: '🫒',
+                badgeColor: 'emerald',
+                environment: '地中海性気候 (Cs)',
+                climateDetails: '夏の高温乾燥と冬の温暖多雨（乾季に耐えうる耐乾性）',
+                soilDetails: '石灰質土壌、テラロッサ（水はけが非常に良い赤色土）',
+                geographyNote: '葉が硬く小さく蒸散を防ぐ硬葉樹。地中海沿岸諸国が世界産の大部分を占め、自給地中海式農業の代表格。',
+                producers: ['スペイン', 'イタリア', 'ギリシャ', 'チュニジア', 'トルコ'],
+                locations: [
+                    { name: 'アンダルシア州 (スペイン)', lat: 37.3, lng: -4.5 },
+                    { name: 'プーリア州 (イタリア)', lat: 41.0, lng: 16.5 },
+                    { name: 'ペロポネソス半島 (ギリシャ)', lat: 37.5, lng: 22.3 }
+                ]
+            },
+            {
+                id: 'rubber',
+                type: 'agri',
+                name: '天然ゴム',
+                category: '工芸作物',
+                icon: '🌳',
+                badgeColor: 'teal',
+                environment: '熱帯雨林気候 (Af)',
+                climateDetails: '年間を通した高温多雨（平均気温25℃以上、降水量2,000mm以上）',
+                soilDetails: 'ラトソル（赤色強酸性土壌）でも育つ',
+                geographyNote: '原産はアマゾン川流域だが、現在は東南アジアのプランテーションで世界生産の大部分を占める（パラゴムノキの樹液）。',
+                producers: ['タイ', 'インドネシア', 'ベトナム', 'マレーシア', 'インド'],
+                locations: [
+                    { name: 'タイ南部 (タイ)', lat: 8.0, lng: 99.5 },
+                    { name: 'スマトラ島 (インドネシア)', lat: 0.5, lng: 101.5 },
+                    { name: 'マレー半島 (マレーシア)', lat: 3.0, lng: 101.5 }
+                ]
+            },
+            {
+                id: 'cotton',
+                type: 'agri',
+                name: '綿花',
+                category: '繊維作物',
+                icon: '☁️',
+                badgeColor: 'sky',
+                environment: '熱帯・亜熱帯・乾燥帯（灌漑）',
+                climateDetails: '生育期に高温多雨、収穫期に乾燥（雨が降ると品質低下）',
+                soilDetails: 'デカン高原のレグール土（玄武岩質黒色土）、ウズベキスタンの灌漑地',
+                geographyNote: '開花・開綿期の乾燥・晴天が不可欠。かつてアラル海に注ぐ川からの過剰灌漑で環境問題を起こしたウズベキスタン等も産地。',
+                producers: ['インド', '中国', 'アメリカ', 'ブラジル', 'パキスタン'],
+                locations: [
+                    { name: 'デカン高原 (インド)', lat: 18.5, lng: 75.0 },
+                    { name: '新疆ウイグル自治区 (中国)', lat: 41.5, lng: 86.0 },
+                    { name: 'テキサス州 (アメリカ)', lat: 32.0, lng: -99.0 }
+                ]
+            },
+
+            // FRUITS & VEGETABLES
+            {
+                id: 'banana',
+                type: 'agri',
+                name: 'バナナ',
+                category: '果物・熱帯作物',
+                icon: '🍌',
+                badgeColor: 'yellow',
+                environment: '熱帯雨林・サバナ気候 (Af, Aw)',
+                climateDetails: '年間を通して高温多雨（年平均27℃以上、降水量2,000mm以上）',
+                soilDetails: '水はけが良く有機質に富む沖積土・火山灰土',
+                geographyNote: '熱帯沿岸低地の高温多雨地帯で大規模プランテーション栽培。強風に弱いため台風の少ない地域が好まれる。',
+                producers: ['インド', '中国', 'インドネシア', 'ナイジェリア', 'エクアドル', 'フィリピン'],
+                locations: [
+                    { name: 'グアヤキル沿岸 (エクアドル)', lat: -2.2, lng: -79.9 },
+                    { name: 'ミンダナオ島 (フィリピン)', lat: 7.1, lng: 125.6 },
+                    { name: 'ケララ州 (インド)', lat: 10.5, lng: 76.2 }
+                ]
+            },
+            {
+                id: 'grape',
+                type: 'agri',
+                name: 'ブドウ',
+                category: '果物・樹木作',
+                icon: '🍇',
+                badgeColor: 'indigo',
+                environment: '地中海性気候 (Cs)・温帯',
+                climateDetails: '夏季に乾燥し日照時間が長い（糖度が高まる）、日夜の寒暖差',
+                soilDetails: '水はけの非常に良い石灰質・砂質・礫質土壌',
+                geographyNote: 'ワイン用と生食用に大別。地中海沿岸やカリフォルニア、チリなどの夏季乾燥地帯で盛んに栽培される。',
+                producers: ['中国', 'イタリア', 'フランス', 'アメリカ', 'スペイン'],
+                locations: [
+                    { name: 'ボルドー (フランス)', lat: 44.8, lng: -0.6 },
+                    { name: 'トスカーナ (イタリア)', lat: 43.4, lng: 11.2 },
+                    { name: 'ナパ・バレー (アメリカ)', lat: 38.3, lng: -122.3 },
+                    { name: 'セントラル・バレー (チリ)', lat: -35.0, lng: -71.0 }
+                ]
+            },
+            {
+                id: 'potato',
+                type: 'agri',
+                name: 'ジャガイモ',
+                category: '野菜・根菜・主食作物',
+                icon: '🥔',
+                badgeColor: 'amber',
+                environment: '冷帯・温帯・高地 (D, Cfb)',
+                climateDetails: '冷涼な気候（生育適温15〜20℃）、生育期間が短い',
+                soilDetails: '水はけが良い砂質・火山灰土壌、やや酸性の土地でも育つ',
+                geographyNote: 'アンデス高地原産。耐寒性が高く土地を選ばないため、ヨーロッパ北部の平原や冷帯地帯で重要な主食とされる。',
+                producers: ['中国', 'インド', 'ロシア', 'ウクライナ', 'アメリカ'],
+                locations: [
+                    { name: 'アレキパ・アンデス高地 (ペルー)', lat: -16.4, lng: -71.5 },
+                    { name: 'ポーランド平原 (ポーランド)', lat: 52.0, lng: 20.0 },
+                    { name: 'アイダホ州 (アメリカ)', lat: 44.0, lng: -114.0 }
+                ]
+            },
+            {
+                id: 'dates',
+                type: 'agri',
+                name: 'ナツメヤシ (デーツ)',
+                category: '果物・オアシス作物',
+                icon: '🌴',
+                badgeColor: 'amber',
+                environment: '乾燥帯 (BW, BS)',
+                climateDetails: '極度の乾燥・高温（「足は水に、頭は火に」と言われる環境）',
+                soilDetails: '塩分に強く、地下水や湧水が得られるオアシス周辺の砂質土',
+                geographyNote: '北アフリカから中東の砂漠地帯で重要な食料資源。果率は栄養豊富で保存性に優れ、オアシス農業のシンボル。',
+                producers: ['エジプト', 'サウジアラビア', 'イラン', 'アルジェリア', 'イラク'],
+                locations: [
+                    { name: 'ナイル川流域 (エジプト)', lat: 26.0, lng: 32.6 },
+                    { name: 'リヤド周辺オアシス (サウジアラビア)', lat: 24.7, lng: 46.7 },
+                    { name: 'バグダッド周辺 (イラク)', lat: 33.3, lng: 44.4 }
+                ]
+            },
+            {
+                id: 'apple',
+                type: 'agri',
+                name: 'リンゴ',
+                category: '果物・樹木作',
+                icon: '🍎',
+                badgeColor: 'rose',
+                environment: '冷帯・温帯 (Cfb, D)',
+                climateDetails: '夏が冷涼で秋の昼夜の寒暖差が大きい（年平均気温7〜12℃）',
+                soilDetails: '排水性と透水性に優れ、適度な保水性をもつ土壌',
+                geographyNote: '寒冷な気候を好み、北半球の冷涼な地域（欧州北部・中国東北部・米国北部・日本の東北等）で広く栽培される。',
+                producers: ['中国', 'アメリカ', 'トルコ', 'ポーランド', 'インド'],
+                locations: [
+                    { name: '山東省 (中国)', lat: 36.5, lng: 118.0 },
+                    { name: 'ワシントン州 (アメリカ)', lat: 47.5, lng: -120.5 },
+                    { name: '青森県 (日本)', lat: 40.8, lng: 140.7 }
+                ]
+            },
+            {
+                id: 'tomato',
+                type: 'agri',
+                name: 'トマト',
+                category: '野菜・園芸作物',
+                icon: '🍅',
+                badgeColor: 'rose',
+                environment: '地中海性気候・温帯 (Cs, Cfa)',
+                climateDetails: '日照量が豊富で湿度が低い（過湿で病気になりやすい）',
+                soilDetails: '土壌を選ばないが、排水性と通気性の良い深度の高い土壌',
+                geographyNote: '南米アンデス原産。加工用ペーストや生食用として、地中海沿岸や中国、アメリカなどの近郊農業・園芸農業で生産される。',
+                producers: ['中国', 'インド', 'トルコ', 'アメリカ', 'イタリア'],
+                locations: [
+                    { name: 'カンパニア州 (イタリア)', lat: 40.8, lng: 14.2 },
+                    { name: '新疆ウイグル自治区 (中国)', lat: 43.8, lng: 87.6 },
+                    { name: 'カリフォルニア州 (アメリカ)', lat: 36.7, lng: -119.8 }
+                ]
+            },
+
+            // MINERAL RESOURCES
+            {
+                id: 'iron',
+                type: 'mineral',
+                name: '鉄鉱石',
+                category: '金属資源',
+                icon: '🪨',
+                badgeColor: 'amber',
+                environment: '安定陸塊 (先カンブリア時代)',
+                climateDetails: '地質依存（先カンブリア時代の露頭地帯）',
+                soilDetails: '帯状鉄鉱層（BIF：海水中の鉄分が酸素と反応し沈殿）',
+                geographyNote: '地球上で最も広く使用される金属原料。安定陸塊に大規模露出しており、巨大バケットによる露天掘りが行われる。',
+                producers: ['オーストラリア', 'ブラジル', '中国', 'インド', 'ロシア'],
+                locations: [
+                    { name: 'ピルバラ地区 (オーストラリア)', lat: -22.5, lng: 118.5 },
+                    { name: 'カラジャス・イタビラ (ブラジル)', lat: -6.0, lng: -50.1 },
+                    { name: '鞍山（アンシャン） (中国)', lat: 41.1, lng: 123.0 },
+                    { name: 'クルスク磁気異常 (ロシア)', lat: 51.7, lng: 36.1 }
+                ]
+            },
+            {
+                id: 'coal',
+                type: 'mineral',
+                name: '石炭',
+                category: 'エネルギー・鉱物資源',
+                icon: '⬛',
+                badgeColor: 'slate',
+                environment: '古期造山帯 (古生代の地層)',
+                climateDetails: '古生代石炭紀・二畳紀の大森林が地中に埋没炭化',
+                soilDetails: '古生代の陸成層・なだらかな古期造山帯の山脈周辺',
+                geographyNote: '古期造山帯に多く産出。良質な粘結炭（製鉄用）や無煙炭・一般炭（発電用）がある。露天掘りと坑内掘りの両方。',
+                producers: ['中国', 'インド', 'インドネシア', 'アメリカ', 'オーストラリア'],
+                locations: [
+                    { name: 'アパラチア炭田 (アメリカ)', lat: 38.0, lng: -81.0 },
+                    { name: '山西省炭田 (中国)', lat: 37.8, lng: 112.5 },
+                    { name: 'モウラ炭田・クイーンズランド (オーストラリア)', lat: -24.5, lng: 149.8 },
+                    { name: 'クズネツク炭田 (ロシア)', lat: 55.3, lng: 86.0 }
+                ]
+            },
+            {
+                id: 'oil',
+                type: 'mineral',
+                name: '石油 (原油)',
+                category: 'エネルギー資源',
+                icon: '🛢️',
+                badgeColor: 'rose',
+                environment: '背斜構造・新期造山帯・堆積盆地',
+                climateDetails: '中生代〜新生代の浅い海や湖で有機物が堆積',
+                soilDetails: '泥岩・砂岩の不透水層に挟まれた背斜構造（ドーム状）',
+                geographyNote: 'ペルシャ湾沿岸の安定地台・背斜構造に世界の埋蔵量の多くが集中。パイプラインやタンカーで輸送。',
+                producers: ['アメリカ', 'サウジアラビア', 'ロシア', 'カナダ', 'イラク'],
+                locations: [
+                    { name: 'ガワール油田 (サウジアラビア)', lat: 25.0, lng: 49.5 },
+                    { name: 'パーミアン盆地 (アメリカ・テキサス)', lat: 31.8, lng: -102.3 },
+                    { name: '西シベリア油田 (ロシア)', lat: 61.0, lng: 73.0 },
+                    { name: '北海油田 (イギリス・ノルウェー)', lat: 56.5, lng: 3.2 }
+                ]
+            },
+            {
+                id: 'bauxite',
+                type: 'mineral',
+                name: 'ボーキサイト (アルミ原料)',
+                category: '有色金属資源',
+                icon: '🟧',
+                badgeColor: 'orange',
+                environment: '熱帯・亜熱帯のラトソル風化帯',
+                climateDetails: '高温多雨による強烈な風化（淋溶作用）',
+                soilDetails: 'けい酸分が洗い流され、酸化アルミニウムが濃縮した赤色残積土',
+                geographyNote: 'アルミニウムの原料。精錬には莫大な電気エネルギーが必要なため「電気の缶詰」と呼ばれ、水力発電の豊かな国で製錬されることが多い。',
+                producers: ['オーストラリア', 'ギニア', '中国', 'ブラジル', 'インドネシア'],
+                locations: [
+                    { name: 'ウェパ (オーストラリア)', lat: -12.6, lng: 141.8 },
+                    { name: 'ボケ鉱床 (ギニア)', lat: 10.9, lng: -14.3 },
+                    { name: 'パラゴミナス (ブラジル)', lat: -3.0, lng: -47.3 }
+                ]
+            },
+            {
+                id: 'copper',
+                type: 'mineral',
+                name: '銅鉱石',
+                category: '有色金属資源',
+                icon: '🥉',
+                badgeColor: 'amber',
+                environment: '新期造山帯 (環太平洋造山帯)',
+                climateDetails: 'マグマ活動・斑岩型熱水鉱床（マグマからの熱水濃縮）',
+                soilDetails: '新期造山帯の火成岩・火山帯周辺',
+                geographyNote: '電気導電性が高く電線や電子機器に不可欠。チリのアンデス山脈沿いに巨大な斑岩型銅床が集中（チュキカマタ銅山など）。',
+                producers: ['チリ', 'ペルー', '中国', 'コンゴ民主共和国', 'アメリカ'],
+                locations: [
+                    { name: 'チュキカマタ銅山 (チリ)', lat: -22.3, lng: -68.9 },
+                    { name: 'エスコンディーダ銅山 (チリ)', lat: -24.2, lng: -69.0 },
+                    { name: 'グラベルグ銅山 (インドネシア)', lat: -4.0, lng: 137.1 }
+                ]
+            },
+            {
+                id: 'lithium',
+                type: 'mineral',
+                name: 'リチウム',
+                category: 'レアメタル・電池原料',
+                icon: '🔋',
+                badgeColor: 'indigo',
+                environment: '乾燥帯の塩湖・鉱石鉱床',
+                climateDetails: '極度の乾燥気候（蒸発量が降水量を超えるエリア）',
+                soilDetails: '塩原（塩湖の水が蒸発しリチウム塩化物が濃縮）',
+                geographyNote: 'EV（電気自動車）やスマートフォン等のリチウムイオン電池に必須。チリ・ボリビア・アルゼンチンの「リチウムトライアングル」に集中。',
+                producers: ['オーストラリア', 'チリ', '中国', 'アルゼンチン', 'ブラジル'],
+                locations: [
+                    { name: 'アタカマ塩原 (チリ)', lat: -23.5, lng: -68.3 },
+                    { name: 'ウユニ塩原 (ボリビア)', lat: -20.2, lng: -67.5 },
+                    { name: 'グリーンブッシュズ鉱山 (オーストラリア)', lat: -33.8, lng: 116.0 }
+                ]
+            }
+        ];
+
+        // Quiz Questions Dataset (Expanded & Categorized)
+        const ALL_QUIZ_QUESTIONS = [
+            {
+                category: 'agri',
+                tag: '農産物：気候・土壌判定',
+                question: '年間降水量が500〜800mm程度の半乾燥地帯で、黒土（チェルノーゼム）やプレーリー土と呼ばれる有機物に富む肥沃な土壌を利用して大規模栽培される穀物はどれか？',
+                conditions: ['気候: 温帯・冷帯・ステップ気候', '土壌: チェルノーゼム（黒土）', '特徴: 年降水量 500〜800mm'],
+                options: ['米 (アジアイネ)', '小麦', '天然ゴム', 'オリーブ'],
+                correct: 1,
+                explanation: '正解は「小麦」です。小麦は米よりも乾燥や冷涼さに強く、年降水量500〜800mm前後のステップ気候帯やチェルノーゼム（ウクライナ・ロシア等）で大規模に栽培されます。'
+            },
+            {
+                category: 'agri',
+                tag: '農産物：主要気候・水利用',
+                question: '夏季の高温多雨（年間降水量1,000mm以上）と保水性の高い沖積土壌が必須条件で、アジアのモンスーン地帯を中心に高い人口支持力を支えている主食穀物はどれか？',
+                conditions: ['気候: 熱帯・温帯モンスーン', '土壌: 沖積土・粘土質土壌', '特徴: 年降水量 1,000mm以上'],
+                options: ['小麦', 'トウモロコシ', '米 (アジアイネ)', 'ジャガイモ'],
+                correct: 2,
+                explanation: '正解は「米 (アジアイネ)」です。アジアの河川下流デルタや平野部で集約的に栽培され、非常に高い人口収容力を誇ります。'
+            },
+            {
+                category: 'agri',
+                tag: '農産物：土壌・傾斜条件',
+                question: '年間を通じて1,500mm以上の十分な降水量と温暖な気候が必要で、根が水に浸かるのを避けるため排水性の良い弱酸性の丘陵地・山地傾斜地で栽培される作物はどれか？',
+                conditions: ['気候: 温暖湿潤・熱帯高地', '土壌: 弱酸性の水はけが良い土壌', '地形: 丘陵・傾斜地'],
+                options: ['茶', 'コーヒー', 'サトウキビ', '綿花'],
+                correct: 0,
+                explanation: '正解は「茶」です。水はけ（排水性）が極めて重要なため、平野部ではなくアッサムやダージリン、静岡などの丘陵地・傾斜地が選ばれます。'
+            },
+            {
+                category: 'agri',
+                tag: '農産物：土壌条件',
+                question: 'ブラジル高原の「テラローシャ（玄武岩質の暗赤色風化土）」や火山灰土壌が広がる赤道付近の霜が降りない熱帯高地（コーヒーベルト）で主産地を形成する商品はどれか？',
+                conditions: ['土壌: テラローシャ（玄武岩質風化土）', '地形: 熱帯高地・水はけが良い傾斜', '気候: 霜が降りない温和な環境'],
+                options: ['コーヒー', '茶', 'カカオ', 'トウモロコシ'],
+                correct: 0,
+                explanation: '正解は「コーヒー」です。ブラジル高原のテラローシャはコーヒー栽培に好適な栄養豊富な土壌として有名です。'
+            },
+            {
+                category: 'agri',
+                tag: '農産物：工芸作物',
+                question: '年間を通した高温多雨（赤道付近の熱帯雨林気候）が必要で、樹液（ラテックス）を採取してタイヤやゴム製品の原料とされる植物はどれか？',
+                conditions: ['気候: 熱帯雨林気候 (Af)', '環境: 年間高温多雨（2,000mm以上）', '産地: タイ・インドネシア等'],
+                options: ['油ヤシ', '天然ゴム', '綿花', 'カカオ'],
+                correct: 1,
+                explanation: '正解は「天然ゴム」です。パラゴムノキから採れる樹液が原料で、現在は東南アジアのプランテーションが世界の大部分を占めます。'
+            },
+            {
+                category: 'fruit',
+                tag: '果物・地中海性気候',
+                question: '夏季に強烈な日照と乾燥があり、水はけの良い石灰質・砂質土壌の地中海沿岸やカリフォルニア等でワイン用・生食用として盛んに栽培される果物はどれか？',
+                conditions: ['気候: 地中海性気候 (Cs)', '環境: 夏季乾燥・豊富な日照', '用途: ワイン醸造・生食・レーズン'],
+                options: ['バナナ', 'ブドウ', 'リンゴ', '天然ゴム'],
+                correct: 1,
+                explanation: '正解は「ブドウ」です。夏の光合成と糖度濃縮に好適な地中海沿岸やカリフォルニア、チリなどで盛んに栽培されています。'
+            },
+            {
+                category: 'fruit',
+                tag: '果物・オアシス農業',
+                question: '北アフリカや中東の極度に乾燥した砂漠地帯で、地下水や湧水が得られるオアシス周辺の耐塩性土壌で栽培される主要な食料樹木作物はどれか？',
+                conditions: ['気候: 乾燥帯 (BW, BS)', '環境: オアシス周辺・地下水依存', '特徴: 「足は水に、頭は火に」'],
+                options: ['ナツメヤシ (デーツ)', 'オリーブ', 'バナナ', 'リンゴ'],
+                correct: 0,
+                explanation: '正解は「ナツメヤシ (デーツ)」です。非常に乾燥に強く、栄養価が高く保存性にも優れているため砂漠地帯の伝統的主食です。'
+            },
+            {
+                category: 'fruit',
+                tag: '果物・熱帯プランテーション',
+                question: '年間を通じて27℃以上の高温多雨環境が必要で、熱帯沿岸の低地部で大型の強風に強い地域を選びプランテーション栽培される果物はどれか？',
+                conditions: ['気候: 熱帯雨林・サバナ気候', '環境: 年中高温多雨・無台風地帯', '主要国: エクアドル・フィリピン'],
+                options: ['リンゴ', 'バナナ', 'オリーブ', 'ブドウ'],
+                correct: 1,
+                explanation: '正解は「バナナ」です。風に弱いため大型台風の影響が少ない熱帯沿岸部（フィリピンのミンダナオ島やエクアドル等）で生産されます。'
+            },
+            {
+                category: 'fruit',
+                tag: '野菜/根菜・高地・冷帯',
+                question: 'アンデス高地原産で耐寒性が高く、短期間の生育で収穫可能なため、ヨーロッパ北部や冷帯地域で重要な主食として広まったナス科の根菜はどれか？',
+                conditions: ['気候: 冷帯・冷涼な温帯・高地', '原産: アンデス高地', '特徴: 酸性土・痩せた土地でも生育'],
+                options: ['ジャガイモ', 'サトウキビ', 'トマト', 'トウモロコシ'],
+                correct: 0,
+                explanation: '正解は「ジャガイモ」です。冷涼で痩せた土地でも育つため、ヨーロッパ北部の平原や冷帯地帯での主食として普及しました。'
+            },
+            {
+                category: 'fruit',
+                tag: '果物・寒冷地適応',
+                question: '夏が冷涼で秋の昼夜の寒暖差が大きい北半球の寒冷な温帯・冷帯地域（青森、中国東北部、米国ワシントン州）で主に生産される果物はどれか？',
+                conditions: ['気候: 冷帯・冷涼な温帯', '環境: 夏季冷涼・秋の寒暖差', '特徴: 耐寒性樹木'],
+                options: ['ナツメヤシ', 'リンゴ', 'バナナ', '柑橘類'],
+                correct: 1,
+                explanation: '正解は「リンゴ」です。寒冷な気候を好み、秋の寒暖差で着色と甘みが促進されるため、寒冷な地帯で盛んに栽培されます。'
+            },
+            {
+                category: 'mineral',
+                tag: '鉱産資源：地質構造',
+                question: '先カンブリア時代の海水中の鉄分が酸化・沈殿してできた「帯状鉄鉱層」を起源とし、オーストラリアのピルバラやブラジルのカラジャス（安定陸塊）で採掘される資源はどれか？',
+                conditions: ['地質: 安定陸塊（先カンブリア時代）', '成因: 帯状鉄鉱層 (BIF)', '方法: 大規模露天掘り'],
+                options: ['石炭', '鉄鉱石', '銅鉱石', '石油'],
+                correct: 1,
+                explanation: '正解は「鉄鉱石」です。古代の先カンブリア時代に形成された安定陸塊に多く露出しており、巨大な露天掘り鉱山で採掘されます。'
+            },
+            {
+                category: 'mineral',
+                tag: '鉱産資源：地質構造',
+                question: '古生代の植物群が大規模に埋没・炭化したもので、アパラチア山脈やウラル山脈などの「古期造山帯」に多く産出するエネルギー資源はどれか？',
+                conditions: ['地質: 古期造山帯（古生代）', '成因: シダ植物群等の炭化', '主な用途: 火力発電・製鉄'],
+                options: ['石油', '鉄鉱石', '石炭', 'ボーキサイト'],
+                correct: 2,
+                explanation: '正解は「石炭」です。古生代（石炭紀など）の植物が地中に埋もれて炭化したもので、なだらかな古期造山帯に多く分布しています。'
+            },
+            {
+                category: 'mineral',
+                tag: '鉱産資源：成因・風化',
+                question: '熱帯の高温多雨環境で強烈な風化（ラトソル化）を受け、けい酸分が溶け去りアルミニウムが濃縮して形成されるアルミニウムの原料鉱石はどれか？',
+                conditions: ['気候: 熱帯・亜熱帯の高温多雨', '過程: ラトソル風化（淋溶作用）', '用途: アルミニウム精錬'],
+                options: ['銅鉱石', 'ボーキサイト', 'リチウム', '金'],
+                correct: 1,
+                explanation: '正解は「ボーキサイト」です。オーストラリアのウェパやギニア、ブラジルなど熱帯地域の風化帯で大規模に採掘されます。'
+            },
+            {
+                category: 'mineral',
+                tag: '鉱産資源：造山帯',
+                question: 'アンデス山脈などの「新期造山帯」におけるマグマの熱水活動（斑岩型鉱床）によって形成され、チリのチュキカマタ等で世界最大級の採掘が行われている金属資源はどれか？',
+                conditions: ['地質: 新期造山帯（環太平洋造山帯）', '成因: マグマの熱水作用', '主な産地: チリ（アンデス山脈）'],
+                options: ['鉄鉱石', '石炭', '銅鉱石', 'ダイヤモンド'],
+                correct: 2,
+                explanation: '正解は「銅鉱石」です。環太平洋造山帯などの新期造山帯に集中しており、チリは世界最大の銅生産国です。'
+            },
+            {
+                category: 'mineral',
+                tag: '鉱産資源：新資源・レアメタル',
+                question: '乾燥帯の塩湖の水が蒸発濃縮した塩原（チリ・ボリビアのウユニ塩原等）に存在し、EVやスマートフォンのバッテリーに不可欠なレアメタルはどれか？',
+                conditions: ['気候: 乾燥帯の塩湖・塩原', '特徴: 蒸発濃縮（リチウムトライアングル）', '用途: リチウムイオン電池'],
+                options: ['リチウム', 'ボーキサイト', '石油', '亜鉛'],
+                correct: 0,
+                explanation: '正解は「リチウム」です。乾燥地帯の塩湖から蒸発濃縮された塩化リチウムとして大量に採掘・精製されます。'
+            }
+        ];
+
+        // Global State
+        let currentCategory = 'all';
+        let currentQuizFilter = 'all';
+        let filteredQuizQuestions = [];
+        let leafletMap = null;
+        let mapMarkers = [];
+        let currentQuizIndex = 0;
+        let quizScore = 0;
+
+        // Initialize App
+        window.onload = function() {
+            renderExplorerCards();
+            initMap();
+            populateMapSelectOptions();
+            setQuizFilter('all');
+        };
+
+        function switchTab(tabId) {
+            // Hide all sections
+            ['explorer', 'map-view', 'matrix', 'quiz'].forEach(id => {
+                const sec = document.getElementById(`section-${id}`);
+                sec.classList.add('hidden');
+                sec.classList.remove('flex');
+                
+                const btn = document.getElementById(`tab-${id}`);
+                btn.classList.remove('bg-emerald-600', 'text-white', 'shadow');
+                btn.classList.add('text-slate-400');
+            });
+
+            // Show target section
+            const activeSection = document.getElementById(`section-${tabId}`);
+            activeSection.classList.remove('hidden');
+            if (tabId === 'explorer') {
+                activeSection.classList.add('flex');
+            }
+
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('bg-emerald-600', 'text-white', 'shadow');
+            activeBtn.classList.remove('text-slate-400');
+
+            // Resize leaflet map if switching to map tab
+            if (tabId === 'map-view' && leafletMap) {
+                setTimeout(() => {
+                    leafletMap.invalidateSize();
+                }, 200);
+            }
+        }
+
+        // Filter Handlers for Explorer
+        function setCategoryFilter(cat) {
+            currentCategory = cat;
+            ['all', 'agri', 'mineral'].forEach(id => {
+                const btn = document.getElementById(`cat-${id}`);
+                if (id === cat) {
+                    btn.classList.add('bg-slate-800', 'text-white', 'shadow');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-white', 'shadow');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+            renderExplorerCards();
+        }
+
+        function renderExplorerCards() {
+            const grid = document.getElementById('explorer-grid');
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const envVal = document.getElementById('environment-filter').value;
+
+            const filtered = DATA_ITEMS.filter(item => {
+                // Category match
+                if (currentCategory === 'agri' && item.type !== 'agri') return false;
+                if (currentCategory === 'mineral' && item.type !== 'mineral') return false;
+
+                // Environment filter match
+                if (envVal && !item.environment.includes(envVal)) return false;
+
+                // Search query match
+                if (searchVal) {
+                    const textContent = `${item.name} ${item.category} ${item.environment} ${item.climateDetails} ${item.soilDetails} ${item.producers.join(' ')}`.toLowerCase();
+                    if (!textContent.includes(searchVal)) return false;
+                }
+
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500">
+                        <i class="fa-solid fa-circle-question text-3xl mb-2"></i>
+                        <p class="text-sm">条件に一致する資源・農産物が見つかりませんでした。</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(item => {
+                const isAgri = item.type === 'agri';
+                const tagBg = isAgri ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+                return `
+                    <div onclick="openModal('${item.id}')" class="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between gap-4 group">
+                        <div class="space-y-3">
+                            <div class="flex items-start justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl p-2 bg-slate-950 rounded-xl border border-slate-800/80 group-hover:scale-110 transition-transform">${item.icon}</span>
+                                    <div>
+                                        <h3 class="text-base font-bold text-white group-hover:text-emerald-400 transition-colors">${item.name}</h3>
+                                        <span class="text-[11px] px-2 py-0.5 rounded-md font-medium border ${tagBg}">${item.category}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 space-y-1.5 text-xs">
+                                <div class="flex items-center gap-1.5 text-slate-300 font-semibold">
+                                    <i class="fa-solid ${isAgri ? 'fa-sun' : 'fa-layer-group'} text-[10px] text-slate-400"></i>
+                                    <span>${isAgri ? '適正気候:' : '地質構造:'}</span>
+                                    <span class="text-slate-200">${item.environment}</span>
+                                </div>
+                                <p class="text-slate-400 text-[11px] line-clamp-2">
+                                    ${isAgri ? item.climateDetails : item.soilDetails}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-800/80 pt-3 flex items-center justify-between text-xs text-slate-400">
+                            <span>主な産地: <strong class="text-slate-200">${item.producers.slice(0, 3).join(', ')}</strong></span>
+                            <i class="fa-solid fa-chevron-right text-slate-500 text-[10px] group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function initMap() {
+            leafletMap = L.map('map', {
+                zoomControl: true,
+                minZoom: 2
+            }).setView([20, 10], 2);
+
+            // Dark Mode TileLayer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap & CARTO',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(leafletMap);
+        }
+
+        function populateMapSelectOptions() {
+            const select = document.getElementById('map-item-select');
+            select.innerHTML = DATA_ITEMS.map(item => `
+                <option value="${item.id}">${item.icon} ${item.name} (${item.type === 'agri' ? '農産物' : '鉱産資源'})</option>
+            `).join('');
+            
+            updateMapDisplay();
+        }
+
+        function updateMapDisplay() {
+            const selectedId = document.getElementById('map-item-select').value;
+            const item = DATA_ITEMS.find(i => i.id === selectedId);
+            if (!item) return;
+
+            // Clear old markers
+            mapMarkers.forEach(m => leafletMap.removeLayer(m));
+            mapMarkers = [];
+
+            // Add new markers
+            const isAgri = item.type === 'agri';
+            const markerColor = isAgri ? '#10b981' : '#f59e0b';
+
+            item.locations.forEach(loc => {
+                const marker = L.circleMarker([loc.lat, loc.lng], {
+                    radius: 8,
+                    fillColor: markerColor,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.9,
+                    fillOpacity: 0.8
+                }).addTo(leafletMap);
+
+                marker.bindPopup(`
+                    <div class="text-xs space-y-1">
+                        <div class="font-bold text-sm text-white">${item.icon} ${loc.name}</div>
+                        <div class="text-slate-300">対象: <span class="text-emerald-400 font-semibold">${item.name}</span></div>
+                        <div class="text-slate-400 text-[11px]">${isAgri ? '気候:' : '地質:'} ${item.environment}</div>
+                    </div>
+                `);
+
+                mapMarkers.push(marker);
+            });
+
+            // Update info sidebar panel
+            const infoBox = document.getElementById('map-item-info');
+            infoBox.innerHTML = `
+                <div class="flex items-center gap-2 text-sm font-bold text-white">
+                    <span>${item.icon}</span>
+                    <span>${item.name}</span>
+                </div>
+                <div class="text-emerald-400 font-medium">${isAgri ? '気候条件' : '地質環境'}: ${item.environment}</div>
+                <p class="text-slate-300 leading-relaxed">${item.geographyNote}</p>
+                <div class="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                    主要産出国: <span class="text-slate-200">${item.producers.join(', ')}</span>
+                </div>
+            `;
+
+            // Fit bounds if markers exist
+            if (mapMarkers.length > 0) {
+                const group = L.featureGroup(mapMarkers);
+                leafletMap.fitBounds(group.getBounds().pad(0.3));
+            }
+        }
+
+        function openModal(itemId) {
+            const item = DATA_ITEMS.find(i => i.id === itemId);
+            if (!item) return;
+
+            const isAgri = item.type === 'agri';
+            const modalContent = document.getElementById('modal-content');
+
+            modalContent.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-4xl p-3 bg-slate-950 rounded-2xl border border-slate-800">${item.icon}</span>
+                    <div>
+                        <div class="text-xs text-emerald-400 font-semibold">${item.category} (${isAgri ? '農産物' : '鉱産資源'})</div>
+                        <h2 class="text-2xl font-bold text-white">${item.name}</h2>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                        <span class="text-slate-400 font-medium">${isAgri ? '適正気候・気温' : '該当する地質構造'}</span>
+                        <p class="text-slate-200 font-semibold text-sm">${item.environment}</p>
+                        <p class="text-slate-400 text-[11px]">${item.climateDetails}</p>
+                    </div>
+                    <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                        <span class="text-slate-400 font-medium">${isAgri ? '適正土壌・水資源' : '地質的成因・鉱床'}</span>
+                        <p class="text-slate-200 font-semibold text-sm">${item.soilDetails}</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2 text-xs">
+                    <h4 class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 地理的背景・解説
+                    </h4>
+                    <p class="text-slate-300 leading-relaxed text-sm">${item.geographyNote}</p>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                    <h4 class="font-bold text-white">世界における主要産出国トップ5</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${item.producers.map((p, idx) => `
+                            <span class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 font-medium flex items-center gap-1.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] flex items-center justify-center font-bold">${idx + 1}</span>
+                                ${p}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+        }
+
+        // Quiz Handling Logic
+        function setQuizFilter(filter) {
+            currentQuizFilter = filter;
+            ['all', 'agri', 'fruit', 'mineral'].forEach(id => {
+                const btn = document.getElementById(`qfilter-${id}`);
+                if (id === filter) {
+                    btn.className = "qfilter-btn px-3 py-1 rounded-lg bg-emerald-600 text-white font-medium shadow";
+                } else {
+                    btn.className = "qfilter-btn px-3 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium";
+                }
+            });
+
+            if (filter === 'all') {
+                filteredQuizQuestions = [...ALL_QUIZ_QUESTIONS];
+            } else {
+                filteredQuizQuestions = ALL_QUIZ_QUESTIONS.filter(q => q.category === filter);
+            }
+
+            restartQuiz();
+        }
+
+        function loadQuizQuestion() {
+            if (filteredQuizQuestions.length === 0) return;
+
+            if (currentQuizIndex >= filteredQuizQuestions.length) {
+                showQuizScore();
+                return;
+            }
+
+            const q = filteredQuizQuestions[currentQuizIndex];
+            document.getElementById('quiz-progress-text').innerText = `Question ${currentQuizIndex + 1} / ${filteredQuizQuestions.length}`;
+            document.getElementById('quiz-tag').innerText = q.tag;
+            document.getElementById('quiz-question').innerText = q.question;
+
+            // Render conditions badges
+            document.getElementById('quiz-conditions').innerHTML = `
+                <div class="font-semibold text-slate-400 text-[11px] mb-1">【ヒント・適正条件パラメータ】</div>
+                <div class="flex flex-wrap gap-2">
+                    ${q.conditions.map(c => `<span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-200">${c}</span>`).join('')}
+                </div>
+            `;
+
+            // Render option buttons
+            const optionsBox = document.getElementById('quiz-options');
+            optionsBox.innerHTML = q.options.map((opt, idx) => `
+                <button onclick="checkQuizAnswer(${idx})" class="quiz-opt-btn text-left p-4 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 transition text-sm font-semibold text-slate-200 flex items-center justify-between group">
+                    <span>${opt}</span>
+                    <i class="fa-solid fa-circle-chevron-right text-slate-600 group-hover:text-emerald-400 transition-colors"></i>
+                </button>
+            `).join('');
+
+            document.getElementById('quiz-explanation').classList.add('hidden');
+            document.getElementById('quiz-options').classList.remove('pointer-events-none');
+        }
+
+        function checkQuizAnswer(selectedIdx) {
+            const q = filteredQuizQuestions[currentQuizIndex];
+            const isCorrect = selectedIdx === q.correct;
+
+            if (isCorrect) quizScore++;
+
+            // Disable buttons
+            document.getElementById('quiz-options').classList.add('pointer-events-none');
+
+            // Show explanation
+            const expBox = document.getElementById('quiz-explanation');
+            const titleBox = document.getElementById('quiz-result-title');
+            const bodyBox = document.getElementById('quiz-result-body');
+
+            expBox.classList.remove('hidden');
+            if (isCorrect) {
+                titleBox.className = "font-bold text-sm text-emerald-400 flex items-center gap-1.5";
+                titleBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> 正解です！';
+            } else {
+                titleBox.className = "font-bold text-sm text-rose-400 flex items-center gap-1.5";
+                titleBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> 不正解（正解: ${q.options[q.correct]}）`;
+            }
+
+            bodyBox.innerText = q.explanation;
+        }
+
+        function nextQuestion() {
+            currentQuizIndex++;
+            loadQuizQuestion();
+        }
+
+        function showQuizScore() {
+            document.getElementById('quiz-container').classList.add('hidden');
+            document.getElementById('quiz-score-screen').classList.remove('hidden');
+            document.getElementById('quiz-score-text').innerText = `あなたのスコア: ${filteredQuizQuestions.length}問中 ${quizScore}問正解`;
+        }
+
+        function restartQuiz() {
+            currentQuizIndex = 0;
+            quizScore = 0;
+            document.getElementById('quiz-container').classList.remove('hidden');
+            document.getElementById('quiz-score-screen').classList.add('hidden');
+            loadQuizQuestion();
+        }
+    </script>
+</body>
+</html>
